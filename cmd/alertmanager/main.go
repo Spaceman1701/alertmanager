@@ -491,7 +491,7 @@ func run() int {
 			silencer.Mutes(labels)
 		})
 
-		disp = dispatch.NewDispatcher(alerts, routes, pipeline, marker, timeoutFunc, *dispatchMaintenanceInterval, nil, logger, dispMetrics)
+		newDisp := dispatch.NewDispatcher(alerts, routes, pipeline, marker, timeoutFunc, *dispatchMaintenanceInterval, nil, logger, dispMetrics)
 		routes.Walk(func(r *dispatch.Route) {
 			if r.RouteOpts.RepeatInterval > *retention {
 				configLogger.Warn(
@@ -518,8 +518,18 @@ func run() int {
 			}
 		})
 
-		go disp.Run()
+		// first, start the inhibitor so the inhibition cache can populate
+		// wait for this to load alerts before starting the dispatcher so
+		// we don't accidentially notify for an alert that will be inhibited
 		go inhibitor.Run()
+		inhibitor.WaitForLoading()
+
+		// next, start the dispatcher and wait for it to load before swapping the disp pointer.
+		// This ensures that the API doesn't see the new dispatcher before it finishes populating
+		// the aggrGroups
+		go newDisp.Run()
+		newDisp.WaitForLoading()
+		disp = newDisp
 
 		return nil
 	})
