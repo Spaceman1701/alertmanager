@@ -14,6 +14,8 @@
 package inhibit
 
 import (
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/prometheus/common/model"
@@ -43,11 +45,7 @@ func (c *index) Get(key model.Fingerprint) ([]model.Fingerprint, bool) {
 	if !ok {
 		return nil, false
 	}
-	fps := make([]model.Fingerprint, 0, len(set))
-	for fp := range set {
-		fps = append(fps, fp)
-	}
-	return fps, true
+	return slices.Collect(maps.Keys(set)), true
 }
 
 func (c *index) Add(key, value model.Fingerprint) {
